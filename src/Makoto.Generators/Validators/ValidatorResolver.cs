@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Makoto.Generators.Model;
 using Makoto.Generators.Rules;
 
@@ -9,6 +11,9 @@ namespace Makoto.Generators.Validators;
 internal static class ValidatorResolver
 {
     private const string DefaultCode = "Require";
+
+    // One pass, so a name or argument that itself looks like a placeholder is never substituted again.
+    private static readonly Regex Placeholder = new(@"\{([A-Za-z_][A-Za-z0-9_]*)\}", RegexOptions.CultureInvariant);
 
     public static ValidatorResult Resolve(ValidatorResult result, EquatableArray<RuleInfo> rules)
     {
@@ -33,16 +38,20 @@ internal static class ValidatorResolver
         var rule = call is { IsBound: false } ? FindRule(call, chain, validator, rules) : null;
         var parameters = rule?.Arguments.Select(a => a.Name).ToArray() ?? call?.Parameters.ToArray() ?? [];
 
-        var message = (step.Message ?? rule?.Message ?? call?.Message ?? RuleDiscovery.DefaultMessage).Replace("{PropertyName}", chain.Name);
+        var values = new Dictionary<string, string> { ["PropertyName"] = chain.Name };
         var arguments = call?.Arguments.ToArray() ?? [];
         for (var i = 0; i < arguments.Length; i++)
         {
             var name = arguments[i].Name ?? (i < parameters.Length ? parameters[i] : null);
             if (name is not null && arguments[i].Constant is { } constant)
             {
-                message = message.Replace($"{{{name}}}", constant);
+                values[name] = constant;
             }
         }
+
+        var message = Placeholder.Replace(
+            step.Message ?? rule?.Message ?? call?.Message ?? RuleDiscovery.DefaultMessage,
+            match => values.TryGetValue(match.Groups[1].Value, out var value) ? value : match.Value);
 
         return step with { Code = step.Code ?? rule?.Code ?? call?.Code ?? DefaultCode, Message = message, Rule = null };
     }

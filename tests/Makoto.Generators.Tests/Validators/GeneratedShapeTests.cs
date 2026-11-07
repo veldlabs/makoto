@@ -99,4 +99,54 @@ public class GeneratedShapeTests
             Assert.Contains(line, code);
         }
     }
+
+    /// <summary>foreach over an interface boxes its enumerator. An indexable one is walked by index instead.</summary>
+    [Fact]
+    public void Each_over_an_indexable_interface_is_a_for_loop()
+    {
+        var result = GeneratorHarness.Run("""
+            using System.Collections.Generic;
+            using Makoto;
+
+            public sealed class M
+            {
+                public IReadOnlyList<string>? Labels { get; set; }
+                public IList<int> Counts { get; set; } = [];
+                public IEnumerable<string> Tags { get; set; } = [];
+            }
+
+            [Validator]
+            public sealed partial class V : Validator<M>
+            {
+                protected override void Configure()
+                {
+                    Each(x => x.Labels).Require(x => x.Length != 0);
+                    Each(x => x.Counts).Require(x => x > 0);
+                    Each(x => x.Tags).Require(x => x.Length != 0);
+                }
+            }
+            """);
+
+        ValidatorHarness.AssertClean(result);
+        var code = result.Generated("V");
+        string[] expected =
+        [
+            "if (items0 is not null)",
+            "for (var index0 = 0; index0 < items0.Count; index0++)",
+            "var item0 = items0[index0];",
+            """failures.PrefixFrom(start0, "Labels", index0);""",
+            "for (var index1 = 0; index1 < items1.Count; index1++)",
+            "var item1 = items1[index1];",
+            "foreach (var item2 in items2)",
+        ];
+
+        foreach (var line in expected)
+        {
+            Assert.Contains(line, code);
+        }
+
+        Assert.DoesNotContain("foreach (var item0", code);
+        Assert.DoesNotContain("foreach (var item1", code);
+        Assert.DoesNotContain("index0++;", code);
+    }
 }

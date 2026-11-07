@@ -64,7 +64,8 @@ internal static class RuleDiscovery
 
         var attribute = syntax.Attributes[0];
         var methodName = NamedString(attribute, "Name") ?? StripSuffix(type.Name);
-        if (!SyntaxFacts.IsValidIdentifier(methodName))
+        // IsValidIdentifier accepts reserved keywords; contextual keywords such as 'value' are fine as method names.
+        if (!SyntaxFacts.IsValidIdentifier(methodName) || SyntaxFacts.GetKeywordKind(methodName) != SyntaxKind.None)
         {
             diagnostics.Add(DiagnosticInfo.Create(Diagnostics.RuleInvalidName, location, type.Name, methodName));
         }
@@ -77,7 +78,7 @@ internal static class RuleDiscovery
         var evaluate = ruleBase.GetMembers("Evaluate").OfType<IMethodSymbol>().Single();
         var overridden = OwnTypes(type, ruleBase)
             .SelectMany(t => t.GetMembers("Evaluate").OfType<IMethodSymbol>())
-            .FirstOrDefault(m => m.IsOverride);
+            .FirstOrDefault(m => Overrides(m, evaluate));
         var value = ruleBase.TypeArguments[0];
 
         var rule = new RuleInfo(
@@ -111,6 +112,20 @@ internal static class RuleDiscovery
         }
 
         return null;
+    }
+
+    /// <summary>Whether <paramref name="method"/> overrides <paramref name="target"/>, directly or through intermediate overrides. Other overloads named Evaluate don't count.</summary>
+    private static bool Overrides(IMethodSymbol method, IMethodSymbol target)
+    {
+        for (var current = method.OverriddenMethod; current is not null; current = current.OverriddenMethod)
+        {
+            if (SymbolEqualityComparer.Default.Equals(current.OriginalDefinition, target.OriginalDefinition))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>The rule and its base classes, up to but excluding the ValidationRule base.</summary>

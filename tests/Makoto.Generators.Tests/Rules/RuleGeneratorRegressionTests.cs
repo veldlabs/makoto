@@ -157,4 +157,75 @@ public class RuleGeneratorRegressionTests
 
         Assert.NotEmpty(result.GeneratorDiagnostics);
     }
+
+    // An Evaluate overload declared before the real override used to be picked, and indexing the base
+    // method's parameters with the overload's count crashed both generators.
+    [Fact]
+    public void Evaluate_overload_declared_before_the_override_is_skipped()
+    {
+        var result = RuleAssert.Compiles("""
+            using Makoto;
+
+            public abstract class Mid : ValidationRule<string>
+            {
+                public abstract bool Evaluate(string v, int n);
+            }
+
+            [ValidationRule]
+            public sealed class R2 : Mid
+            {
+                public override bool Evaluate(string v, int n) => true;
+                public override bool Evaluate(string v) => true;
+            }
+            """);
+
+        var extension = RuleAssert.Extension(result.Load(), "R2Extensions", "R2");
+        Assert.Equal([typeof(string)], extension.GetParameters().Select(p => p.ParameterType));
+    }
+
+    [Fact]
+    public void Rule_in_a_keyword_namespace()
+    {
+        var result = RuleAssert.Compiles("""
+            using Makoto;
+
+            namespace @event;
+
+            [ValidationRule]
+            public sealed class R : ValidationRule<string>
+            {
+                public override bool Evaluate(string value) => true;
+            }
+
+            public static class Caller
+            {
+                public static bool Call(string value) => value.R();
+            }
+            """);
+
+        Assert.Equal("event.R.Rule.g.cs", Assert.Single(result.Sources).Key);
+        Assert.Contains("namespace @event;", result.RuleSource("R.Rule.g.cs"));
+    }
+
+    [Fact]
+    public void Rule_with_a_keyword_class_name()
+    {
+        var result = RuleAssert.Compiles("""
+            using Makoto;
+
+            [ValidationRule(Name = "IsEvent")]
+            public partial class @event : ValidationRule<string>
+            {
+                public override bool Evaluate(string value) => true;
+            }
+
+            public static class Caller
+            {
+                public static bool Call(string value) => value.IsEvent();
+            }
+            """);
+
+        Assert.Contains("sealed partial class @event;", result.RuleSource("event.Rule.g.cs"));
+        Assert.True(result.Load().GetType("event")!.IsSealed);
+    }
 }

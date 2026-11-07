@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Makoto.Tests.Rules;
 
 using Makoto.Rules;
@@ -163,6 +165,27 @@ public class ComparisonRuleTests
         Assert.False(missing.LessThan("a"));
         Assert.False(missing.LessThanOrEqual("a"));
         Assert.False(missing.Between("a", "b"));
+    }
+
+    // string.CompareTo is culture-sensitive: under da-DK "aa" sorts after "ab", and every culture ignores a soft hyphen.
+    [Fact]
+    public void Strings_compare_ordinally()
+    {
+        var culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+        try
+        {
+            Assert.True("aa".LessThan("ab"));
+            Assert.True("a".GreaterThan("B"));
+            Assert.True("\u00ADa".GreaterThan("a"));
+            Assert.False("\u00ADa".LessThanOrEqual("a"));
+            Assert.True("b".Between("a", "c"));
+            Assert.False("B".Between("a", "c"));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
     }
 
     // Pinned, not endorsed: IComparable<T> orders NaN below every number, so it passes LessThan.

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Makoto.Rules;
 
 // These take IEnumerable<T> because ICollection<T> and IReadOnlyCollection<T> are unrelated: overloads on the two are
@@ -42,6 +44,10 @@ internal static class Counting
     {
         switch (source)
         {
+            // A default ImmutableArray<T> throws from Count and from its enumerator. It is what a deserializer leaves
+            // in an omitted property, so it counts as empty instead of failing the request with an exception.
+            case ImmutableArray<T> array:
+                return array.IsDefault ? 0 : array.Length;
             case ICollection<T> collection:
                 return collection.Count;
             case IReadOnlyCollection<T> collection:

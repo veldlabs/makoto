@@ -96,6 +96,7 @@ public class NestingBehaviorTests
             public static Order Maybe() => new() { Maybe = [null, new(-1, 0)] };
             public static Order Frozen() => new() { Frozen = ["", "a"] };
             public static Order MaybeFrozen() => new() { MaybeFrozen = ["a", ""] };
+            public static Order DefaultFrozen() => new() { Frozen = default, MaybeFrozen = default(ImmutableArray<string>) };
             public static Order Numbers() => new() { Numbers = [1, -1] };
             public static Order Stock() => new() { Stock = new() { ["a"] = -1 } };
             public static Order Text() => new() { Text = "a b" };
@@ -281,6 +282,7 @@ public class NestingBehaviorTests
                     Each(x => x.Tags).Require(x => x.Filled());
                     Each(x => x.Notes).Require(x => x.Filled());
                     Each(x => x.Lazy).Require(x => x.Filled());
+                    Each(x => x.Lines).ValidateWith<ItemValidator>();
                 }
             }
             """);
@@ -290,8 +292,10 @@ public class NestingBehaviorTests
         Assert.Contains("var span0 = new global::System.ReadOnlySpan<string>(items0);", code);
         Assert.Contains("var span1 = global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(items1);", code);
         Assert.Contains("foreach (var item2 in items2)", code);
+        Assert.Contains("for (var index3 = 0; index3 < items3.Count; index3++)", code);
         Assert.DoesNotContain("foreach (var item0", code);
         Assert.DoesNotContain("foreach (var item1", code);
+        Assert.DoesNotContain("foreach (var item3", code);
     }
 
     [Theory]
@@ -402,6 +406,35 @@ public class NestingBehaviorTests
 
         Assert.Empty(assembly.Failures("V", "Empty"));
         Assert.Equal(["MaybeFrozen[1]"], assembly.Paths("V", "MaybeFrozen"));
+    }
+
+    /// <summary>A deserializer leaves an omitted ImmutableArray property default, and foreach over that throws.</summary>
+    [Fact]
+    public void Each_over_a_default_ImmutableArray_validates_as_empty()
+    {
+        var result = GeneratorHarness.Run(Models, """
+            using Makoto;
+
+            [Validator]
+            public sealed partial class V : Validator<Order>
+            {
+                protected override void Configure()
+                {
+                    Each(x => x.Frozen).Require(x => x.Filled());
+                    Each<string>(x => x.MaybeFrozen).Require(x => x.Filled());
+                }
+            }
+            """);
+
+        ValidatorHarness.AssertClean(result);
+        var code = result.Generated("V");
+        Assert.Contains("if (!items0.IsDefault)", code);
+        Assert.Contains("if (items1 is not null && !items1.GetValueOrDefault().IsDefault)", code);
+
+        // Failures holds Validate, IsValid and Check to the same verdict, so all three are exercised.
+        var assembly = result.Load();
+        Assert.Empty(assembly.Failures("V", "DefaultFrozen"));
+        Assert.Equal(["Frozen[0]", "MaybeFrozen[1]"], assembly.Paths("V", "Frozen").Concat(assembly.Paths("V", "MaybeFrozen")));
     }
 
     [Fact]

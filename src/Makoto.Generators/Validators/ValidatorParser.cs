@@ -188,7 +188,7 @@ internal static class ValidatorParser
             var calls = new Stack<(InvocationExpressionSyntax Call, SimpleNameSyntax Name)>();
             var current = expression;
             while (current is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax access } invocation &&
-                !(access.Expression is ThisExpressionSyntax && IsRoot(access.Name)))
+                !(access.Expression is ThisExpressionSyntax or BaseExpressionSyntax && IsRoot(access.Name)))
             {
                 calls.Push((invocation, access.Name));
                 current = access.Expression;
@@ -427,9 +427,20 @@ internal static class ValidatorParser
             {
                 Report(Diagnostics.ValidateWithMismatch, argument, target.ToDisplayString(), valueType.ToDisplayString());
             }
+            else if (!IsGeneratedValidator(target))
+            {
+                // Only a [Validator] has the static Check and ValidateInto the emitter calls. The attribute is kept in
+                // metadata, so this holds for validators from other assemblies too.
+                Report(Diagnostics.ValidateWithNotGenerated, argument, target.ToDisplayString());
+                return;
+            }
 
             steps.Add(new ValidateWithStep(target.ToQualifiedString()));
         }
+
+        private static bool IsGeneratedValidator(ITypeSymbol target) =>
+            target.GetAttributes().Any(a =>
+                a.AttributeClass is { Name: "ValidatorAttribute", ContainingNamespace: { Name: "Makoto", ContainingNamespace.IsGlobalNamespace: true } });
 
         private static bool Validates(ITypeSymbol target, ITypeSymbol valueType)
         {
@@ -595,6 +606,19 @@ internal static class ValidatorParser
                 return null;
             }
 
+            // An enum constant is its underlying number to the compiler. The member name is what a message wants.
+            var info = semantics.GetTypeInfo(expression, cancellationToken);
+            var type = info.Type is { TypeKind: TypeKind.Enum } ? info.Type : info.ConvertedType;
+            if (type is { TypeKind: TypeKind.Enum } && constant.Value is not null)
+            {
+                var member = type.GetMembers().OfType<IFieldSymbol>()
+                    .FirstOrDefault(f => f.HasConstantValue && Equals(f.ConstantValue, constant.Value));
+                if (member is not null)
+                {
+                    return member.Name;
+                }
+            }
+
             return constant.Value switch
             {
                 null => "null",
@@ -616,10 +640,13 @@ internal static class ValidatorParser
             return null;
         }
 
-        private static CollectionKind ClassifyCollection(ITypeSymbol type) => type switch
+        // A nullable struct collection is classified by what it wraps: the emitter unwraps it after the null check.
+        private static CollectionKind ClassifyCollection(ITypeSymbol type) => Unwrap(type) switch
         {
             IArrayTypeSymbol { IsSZArray: true } => CollectionKind.Array,
             INamedTypeSymbol { Name: "List", Arity: 1, ContainingNamespace: { Name: "Generic", ContainingNamespace: { Name: "Collections", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } } } } => CollectionKind.List,
+            INamedTypeSymbol { OriginalDefinition.SpecialType: SpecialType.System_Collections_Generic_IList_T or SpecialType.System_Collections_Generic_IReadOnlyList_T } => CollectionKind.Indexable,
+            INamedTypeSymbol { OriginalDefinition.MetadataName: "ImmutableArray`1", ContainingNamespace: { Name: "Immutable", ContainingNamespace: { Name: "Collections", ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true } } } } => CollectionKind.ImmutableArray,
             _ => CollectionKind.Enumerable,
         };
 

@@ -169,6 +169,45 @@ public class RuleDiagnosticTests
         """, "'NestedRule'");
 
     [Fact]
+    public void MKO006_invalid_name() => RuleAssert.Rejected("MKO006", """
+        using Makoto;
+
+        [ValidationRule(Name = "not valid")]
+        public sealed class BadNameRule : ValidationRule<int>
+        {
+            public override bool Evaluate(int value) => true;
+        }
+        """, "'not valid'");
+
+    // IsValidIdentifier accepts reserved keywords, which would emit 'public static bool class(...)'.
+    [Fact]
+    public void MKO006_reserved_keyword_name() => RuleAssert.Rejected("MKO006", """
+        using Makoto;
+
+        [ValidationRule(Name = "class")]
+        public sealed class ClassRule : ValidationRule<int>
+        {
+            public override bool Evaluate(int value) => true;
+        }
+        """, "'class'");
+
+    [Fact]
+    public void MKO006_allows_a_contextual_keyword_name() => RuleAssert.Compiles("""
+        using Makoto;
+
+        [ValidationRule(Name = "value")]
+        public sealed class ValueRule : ValidationRule<int>
+        {
+            public override bool Evaluate(int value) => true;
+        }
+
+        public static class Caller
+        {
+            public static bool Call(int number) => number.value();
+        }
+        """);
+
+    [Fact]
     public void Every_problem_of_a_rule_is_reported_at_once()
     {
         var result = GeneratorHarness.Run("""

@@ -119,4 +119,12 @@ public class StringRuleTests
     [InlineData("straße", "STRASSE", false)]
     public void ContainsText(string? value, string text, bool expected) =>
         Assert.Equal(expected, value.ContainsText(text));
+
+    [Fact]
+    public void Null_arguments_count_as_empty()
+    {
+        Assert.True("abc".StartsWithText(null!));
+        Assert.True("abc".EndsWithText(null!));
+        Assert.True("abc".ContainsText(null!));
+    }
 }

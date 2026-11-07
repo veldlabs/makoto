@@ -42,6 +42,14 @@ public class ChainBehaviorTests
             public override bool Evaluate(string value, string text) => value == text;
         }
 
+        public enum Kind { Short = 1, Long = 20 }
+
+        [ValidationRule(Message = "'{PropertyName}' is not {kind}.")]
+        public sealed class IsKindRule : ValidationRule<string, Kind>
+        {
+            public override bool Evaluate(string value, Kind kind) => value.Length <= (int)kind;
+        }
+
         public static class Samples
         {
             public static Person Empty() => new();
@@ -265,6 +273,30 @@ public class ChainBehaviorTests
     }
 
     [Fact]
+    public void Enum_arguments_fill_the_message_with_the_member_name()
+    {
+        var assembly = Validator("""
+            Property(x => x.Name).Require(x => x.IsKind(Kind.Short));
+            Property(x => x.Nick).Require(x => x.IsKind((Kind)3)).WithMessage("{kind}");
+            """);
+
+        Assert.Equal(["Name|IsKind|'Name' is not Short.", "Nick|IsKind|3"], assembly.Failures("V", "NoAt"));
+    }
+
+    [Fact]
+    public void A_name_that_looks_like_a_placeholder_is_not_substituted()
+    {
+        var assembly = Validator("""
+            Property(x => x.Name).Require(x => x.Longest(5)).Named("{max}");
+            Property(x => x.Nick).Require(x => x.IsText("{PropertyName}")).WithMessage("{text} in {PropertyName}");
+            """);
+
+        Assert.Equal(
+            ["{max}|TooLong|'{max}' is over 5.", "Nick|IsText|{PropertyName} in Nick"],
+            assembly.Failures("V", "Long"));
+    }
+
+    [Fact]
     public void Named_changes_the_path_and_the_message_wherever_it_appears()
     {
         var assembly = Validator("""Property(x => x.Name).Require(x => x.IsEmail()).Named("Login");""");
@@ -480,6 +512,14 @@ public class ChainBehaviorTests
         var assembly = Validator("this.Property(x => x.Name).Require(x => x.IsEmail());");
 
         Assert.Single(assembly.Failures("V", "NoAt"));
+    }
+
+    [Fact]
+    public void Base_qualified_roots_work()
+    {
+        var assembly = Validator("base.Property(x => x.Name).Require(x => x.IsEmail()); base.Each(x => x.Name).Require(x => x != 'n');");
+
+        Assert.Equal(["Name", "Name[0]"], assembly.Paths("V", "NoAt"));
     }
 
     [Fact]

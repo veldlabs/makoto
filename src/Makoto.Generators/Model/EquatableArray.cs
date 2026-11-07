@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace Makoto.Generators.Model;
 
@@ -18,7 +17,25 @@ internal readonly struct EquatableArray<T>(ImmutableArray<T> items) : IEquatable
 
     public T this[int index] => _items[index];
 
-    public bool Equals(EquatableArray<T> other) => this.SequenceEqual(other);
+    // A loop, not SequenceEqual: this runs on every incremental comparison, and LINQ would box both structs and
+    // allocate two enumerators each time.
+    public bool Equals(EquatableArray<T> other)
+    {
+        if (Length != other.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < Length; i++)
+        {
+            if (!EqualityComparer<T>.Default.Equals(_items[i], other._items[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     public override bool Equals(object? obj) => obj is EquatableArray<T> other && Equals(other);
 

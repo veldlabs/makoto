@@ -194,14 +194,22 @@ internal static class ValidatorEmitter
         var item = $"item{index}";
         var position = $"index{index}";
         var start = $"start{index}";
-        var isEnumerable = chain.Collection == CollectionKind.Enumerable;
+        var isEnumerable = chain.Collection is CollectionKind.Enumerable or CollectionKind.ImmutableArray;
         var nullable = chain.CollectionValueKind != ValueKind.Value;
+        var collection = Unwrapped(items, chain.CollectionValueKind);
+
+        // A default ImmutableArray, which a deserializer leaves behind for an omitted property, throws from foreach
+        // and counts as empty here.
+        var guard = Join([
+            nullable ? $"{items} is not null" : null,
+            chain.Collection == CollectionKind.ImmutableArray ? $"!{collection}.IsDefault" : null,
+        ]);
 
         var indent = "        ";
         code.AppendLine($"{indent}var {items} = {chain.Selector.Name}(instance);");
-        if (nullable)
+        if (guard.Length != 0)
         {
-            code.AppendLine($"{indent}if ({items} is not null)");
+            code.AppendLine($"{indent}if ({guard})");
             code.AppendLine($"{indent}{{");
             indent += "    ";
         }
@@ -213,7 +221,12 @@ internal static class ValidatorEmitter
                 code.AppendLine($"{indent}var {position} = 0;");
             }
 
-            code.AppendLine($"{indent}foreach (var {item} in {Unwrapped(items, chain.CollectionValueKind)})");
+            code.AppendLine($"{indent}foreach (var {item} in {collection})");
+        }
+        else if (chain.Collection == CollectionKind.Indexable)
+        {
+            // Indexing an IList<T> or IReadOnlyList<T> is an interface call per element, foreach would box its enumerator.
+            code.AppendLine($"{indent}for (var {position} = 0; {position} < {collection}.Count; {position}++)");
         }
         else
         {
@@ -228,7 +241,11 @@ internal static class ValidatorEmitter
         code.AppendLine($"{indent}{{");
 
         var body = indent + "    ";
-        if (!isEnumerable)
+        if (chain.Collection == CollectionKind.Indexable)
+        {
+            code.AppendLine($"{body}var {item} = {collection}[{position}];");
+        }
+        else if (!isEnumerable)
         {
             code.AppendLine($"{body}var {item} = span{index}[{position}];");
         }
@@ -250,7 +267,7 @@ internal static class ValidatorEmitter
         }
 
         code.AppendLine($"{indent}}}");
-        if (nullable)
+        if (guard.Length != 0)
         {
             code.AppendLine("        }");
         }

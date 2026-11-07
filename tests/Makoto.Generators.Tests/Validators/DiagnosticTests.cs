@@ -32,6 +32,13 @@ public class DiagnosticTests
         {
             protected override void Configure() => Property(x => x.Name).Require(x => x is not null);
         }
+
+        public sealed class HandWrittenValidator : Validator<Address>
+        {
+            protected override void Configure() { }
+            public override ValidationResult Validate(Address instance) => default;
+            public override bool IsValid(Address instance) => true;
+        }
         """;
 
     private static GeneratorHarness.Result Configure(string statements, string members = "") =>
@@ -113,7 +120,6 @@ public class DiagnosticTests
     [InlineData("foreach (var i in new[] { 1 }) Property(x => x.Name).Require(x => true);", "foreach (var i in new[] { 1 }) Property(x => x.Name).Require(x => true);")]
     [InlineData("return;", "return;")]
     [InlineData("Console.WriteLine();", "Console.WriteLine()")]
-    [InlineData("base.Property(x => x.Name).Require(x => true);", "base.Property(x => x.Name).Require(x => true)")]
     [InlineData("Other().Require(x => true);", "Other().Require(x => true)")]
     [InlineData("Property(x => x.Name).Other();", "Property(x => x.Name).Other()")]
     public void MKO012_unsupported_statement(string statement, string reported)
@@ -291,6 +297,28 @@ public class DiagnosticTests
     public void MKO017_ignores_nullability(string statement)
     {
         ValidatorHarness.AssertClean(Configure(statement));
+    }
+
+    /// <summary>Without the attribute there is no generated Check or ValidateInto to call, so this would be CS0117 in the generated file.</summary>
+    [Theory]
+    [InlineData("Property(x => x.Address).ValidateWith<HandWrittenValidator>();")]
+    [InlineData("Each(x => x.Addresses).ValidateWith<HandWrittenValidator>();")]
+    public void MKO019_not_a_generated_validator(string statement)
+    {
+        var result = Configure(statement);
+
+        var diagnostic = Single(result, "MKO019");
+        Assert.Equal("HandWrittenValidator", Text(result, diagnostic));
+        Assert.Contains("'HandWrittenValidator'", diagnostic.GetMessage());
+        AssertSkipped(result);
+    }
+
+    [Fact]
+    public void MKO019_skips_the_step_so_a_modifier_after_it_is_still_reported()
+    {
+        var result = Configure("""Property(x => x.Address).ValidateWith<HandWrittenValidator>().WithCode("a");""");
+
+        Assert.Equal(["MKO018", "MKO019"], result.Ids().Order());
     }
 
     [Theory]

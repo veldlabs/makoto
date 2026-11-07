@@ -22,6 +22,12 @@ internal enum CollectionKind
     None,
     Array,
     List,
+
+    /// <summary>An <c>IList&lt;T&gt;</c> or <c>IReadOnlyList&lt;T&gt;</c>: indexed, so no enumerator is boxed.</summary>
+    Indexable,
+
+    /// <summary>An <c>ImmutableArray&lt;T&gt;</c>, whose default value throws from foreach and counts as empty.</summary>
+    ImmutableArray,
     Enumerable,
 }
 

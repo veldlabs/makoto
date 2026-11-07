@@ -59,10 +59,11 @@ public sealed class EndsWithTextRule : ValidationRule<string, string>
     public override bool Evaluate(string value, string suffix) => value.AsSpan().EndsWith(suffix);
 }
 
-/// <summary>Passes when the string contains <c>text</c>, compared ordinally.</summary>
+/// <summary>Passes when the string contains <c>text</c>, compared ordinally. A null <c>text</c> counts as empty.</summary>
 [ValidationRule(Message = "'{PropertyName}' must contain '{text}'.")]
 public sealed class ContainsTextRule : ValidationRule<string, string>
 {
+    // Through a span so that a null argument matches like StartsWithText and EndsWithText instead of throwing.
     /// <inheritdoc />
-    public override bool Evaluate(string value, string text) => value.Contains(text);
+    public override bool Evaluate(string value, string text) => value.AsSpan().Contains(text.AsSpan(), StringComparison.Ordinal);
 }

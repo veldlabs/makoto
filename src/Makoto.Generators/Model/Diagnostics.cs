@@ -54,6 +54,9 @@ internal static class Diagnostics
     public static readonly DiagnosticDescriptor ModifierWithoutRequire = Error(
         "MKO018", "Modifier has no Require", "'{0}' must follow a Require");
 
+    public static readonly DiagnosticDescriptor ValidateWithNotGenerated = Error(
+        "MKO019", "ValidateWith target is not a [Validator]", "'{0}' is not a [Validator]");
+
     private static DiagnosticDescriptor Error(string id, string title, string message) =>
         new(id, title, message, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 }

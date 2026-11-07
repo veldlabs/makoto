@@ -44,6 +44,18 @@ public class CollectionRuleTests
         Assert.False(new ReadOnlyOnly(0).NotEmpty());
     }
 
+    // A deserializer leaves a default ImmutableArray in an omitted property, and default throws from Count.
+    [Fact]
+    public void Default_ImmutableArray_counts_as_empty()
+    {
+        var missing = default(ImmutableArray<int>);
+
+        Assert.False(missing.NotEmpty());
+        Assert.True(missing.MinCount(0));
+        Assert.False(missing.MinCount(1));
+        Assert.True(missing.MaxCount(0));
+    }
+
     [Fact]
     public void NotEmpty_on_every_declared_interface()
     {

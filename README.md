@@ -16,7 +16,7 @@ public partial class IsEmailValidationRule : ValidationRule<string>
 {
     public override bool Evaluate(string value) => EmailRegex.IsMatch(value);
 
-    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.NonBacktracking)]
     private static partial Regex EmailRegex { get; }
 }
 ```
@@ -78,7 +78,7 @@ static code, including the generated DI registration.
 ## Performance
 
 The same validator in both libraries: five properties, a nested validator and a three-item collection. Measured with
-[BenchmarkDotNet](benchmarks/Makoto.Benchmarks/Program.cs) against FluentValidation 12.1.1, on .NET 10 and a Ryzen 9 7950X.
+[BenchmarkDotNet](https://github.com/veldlabs/makoto/blob/main/benchmarks/Makoto.Benchmarks/Program.cs) against FluentValidation 12.1.1, on .NET 10 and a Ryzen 9 7950X.
 
 | | Mean | Allocated |
 | --- | ---: | ---: |
@@ -98,4 +98,4 @@ failure therefore run twice, as do property getters. Keep rules and getters free
 At tier 1 the JIT inlines the whole chain into the caller, from the validator through the extension method to the
 rule's `Evaluate`, so there is no virtual call left in Makoto's own code.
 
-See [docs/design.md](docs/design.md) for the generated code and exact semantics.
+See [docs/design.md](https://github.com/veldlabs/makoto/blob/main/docs/design.md) for the generated code and exact semantics.

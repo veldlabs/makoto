@@ -23,9 +23,11 @@ public class AllocationTests
 
     private static Signup Sample()
     {
-        // No IEnumerable here: walking an interface allocates its enumerator, which the design accepts.
+        // No IEnumerable here: walking that interface allocates its enumerator, which the design accepts. Labels, an
+        // IReadOnlyList, stays: it is walked by index and must not allocate either.
         var signup = ValidatorTests.Valid();
         signup.Aliases = null;
+        signup.Labels = new List<string> { "b" };
         return signup;
     }
 

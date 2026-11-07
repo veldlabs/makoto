@@ -7,7 +7,7 @@ public partial class IsEmailValidationRule : ValidationRule<string>
 {
     public override bool Evaluate(string value) => EmailRegex.IsMatch(value);
 
-    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")]
+    [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.NonBacktracking)]
     private static partial Regex EmailRegex { get; }
 }
 

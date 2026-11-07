@@ -48,6 +48,11 @@ public class FormatRuleTests
     [InlineData("httpx://a.b", false)]
     [InlineData("http://exa mple.com", false)]
     [InlineData(" http://a.b", false)]
+    [InlineData("http://a.b/a b", false)]
+    [InlineData("http://a.b/a\tb", false)]
+    [InlineData("http://a.b/\n", false)]
+    [InlineData("http://a.b/a\u007Fb", false)]
+    [InlineData("http://a.b/a%20b", true)]
     public void IsUrl(string? value, bool expected) => Assert.Equal(expected, value.IsUrl());
 
     [Theory]

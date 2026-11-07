@@ -45,6 +45,8 @@ public sealed class Signup
     public LineItem[]? Extras { get; set; }
 
     public IEnumerable<string>? Aliases { get; set; }
+
+    public IReadOnlyList<string>? Labels { get; set; }
 }
 
 // Local stand-ins: the built-in rules are written elsewhere and aren't available here.
@@ -125,5 +127,6 @@ public sealed partial class SignupValidator : Validator<Signup>
         Each(x => x.Items).ValidateWith<LineItemValidator>();
         Each(x => x.Extras).Require(x => x is not null).StopOnFailure().ValidateWith<LineItemValidator>();
         Each(x => x.Aliases).Require(x => x.Short(4));
+        Each(x => x.Labels).Require(x => x.Filled());
     }
 }

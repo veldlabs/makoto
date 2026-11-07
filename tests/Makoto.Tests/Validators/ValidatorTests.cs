@@ -18,6 +18,7 @@ public class ValidatorTests
         Items = [new LineItem { Name = "a", Quantity = 1 }],
         Extras = [new LineItem { Name = "b", Quantity = 2 }],
         Aliases = ["a"],
+        Labels = ["b"],
     };
 
     private static (string Path, string Code, string Message)[] Failures(Signup signup)

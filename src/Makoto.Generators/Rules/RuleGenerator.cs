@@ -29,7 +29,8 @@ public sealed class RuleGenerator : IIncrementalGenerator
 
     private static string HintName(RuleInfo rule)
     {
-        var prefix = rule.Namespace is null ? "" : $"{rule.Namespace}.";
+        // The namespace is escaped for keywords (@event), which AddSource rejects in a hint name.
+        var prefix = rule.Namespace is null ? "" : $"{rule.Namespace.Replace("@", "")}.";
         var arity = rule.TypeParameters.Length == 0 ? "" : $"_{rule.TypeParameters.Length}";
         return $"{prefix}{rule.ClassName}{arity}.Rule.g.cs";
     }
@@ -51,11 +52,11 @@ public sealed class RuleGenerator : IIncrementalGenerator
         if (rule.EmitSealed)
         {
             var typeParameters = rule.TypeParameters.Length == 0 ? "" : $"<{string.Join(", ", rule.TypeParameters)}>";
-            code.AppendLine($"sealed partial class {rule.ClassName}{typeParameters};");
+            code.AppendLine($"sealed partial class {Identifier(rule.ClassName)}{typeParameters};");
             code.AppendLine();
         }
 
-        // Partial because Foo and Foo<T> share this class.
+        // Partial because Foo and Foo<T> share this class. The suffix keeps a keyword class name (event) a valid identifier.
         code.AppendLine($"{rule.Accessibility} static partial class {rule.ClassName}Extensions");
         code.AppendLine("{");
 
