@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Makoto/Makoto.csproj" />
+    <Project Path="src/Makoto.Generators/Makoto.Generators.csproj" />
+  </Folder>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Makoto.Benchmarks/Makoto.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Makoto.Tests/Makoto.Tests.csproj" />
+    <Project Path="tests/Makoto.Generators.Tests/Makoto.Generators.Tests.csproj" />
+  </Folder>
+</Solution>
