@@ -35,6 +35,9 @@ public class NestingBehaviorTests
             public Dictionary<string, int>? Stock { get; set; }
             public string? Text { get; set; }
             public object[]? Covariant { get; set; }
+            public IList<string>? Listed { get; set; }
+            public IReadOnlyList<object>? Upcast { get; set; }
+            public IReadOnlyList<string?>? Optional { get; set; }
             public Order? Inner { get; set; }
         }
 
@@ -101,6 +104,16 @@ public class NestingBehaviorTests
             public static Order Stock() => new() { Stock = new() { ["a"] = -1 } };
             public static Order Text() => new() { Text = "a b" };
             public static Order Covariant() => new() { Covariant = new string[] { "a", "" } };
+            public static Order ListedList() => new() { Listed = new List<string> { "", "b", "c", "" } };
+            public static Order ListedArray() => new() { Listed = new[] { "", "b", "c", "" } };
+            public static Order ListedImmutable() => new() { Listed = ImmutableList.Create("", "b", "c", "") };
+            public static Order ListedEmpty() => new() { Listed = ImmutableList<string>.Empty };
+            public static Order UpcastArray() => new() { Upcast = new string[] { "a", "" } };
+            public static Order UpcastList() => new() { Upcast = new List<string> { "a", "" } };
+            public static Order OptionalList() => new() { Optional = new List<string?> { "a", null } };
+            public static Order OptionalArray() => new() { Optional = new string?[] { null, "b" } };
+            public static Order LinesList() => new() { Lines = new List<Item> { new() { Name = "a", Quantity = 1 }, new() { Name = "", Quantity = 0 } } };
+            public static Order LinesArray() => new() { Lines = new Item[] { new() { Name = "a", Quantity = 1 }, new() { Name = "", Quantity = 0 } } };
             public static Order Recursive() => new() { Inner = new() { Inner = new() { Items = [new() { Name = "", Quantity = 1 }] } } };
         }
         """;
@@ -449,6 +462,63 @@ public class NestingBehaviorTests
         Assert.Equal(["Numbers[1]"], assembly.Paths("V", "Numbers"));
         Assert.Equal(["Stock[0]"], assembly.Paths("V", "Stock"));
         Assert.Equal(["Text[1]"], assembly.Paths("V", "Text"));
+    }
+
+    /// <summary>An IList or IReadOnlyList walks a span when it holds a List or an array, and is indexed otherwise. The paths must not tell.</summary>
+    [Theory]
+    [InlineData("ListedList")]
+    [InlineData("ListedArray")]
+    [InlineData("ListedImmutable")]
+    public void Each_over_an_indexable_interface_reports_the_same_whatever_backs_it(string sample)
+    {
+        var assembly = Validator("Each(x => x.Listed).Require(x => x.Filled());");
+
+        Assert.Equal(["Listed[0]", "Listed[3]"], assembly.Paths("V", sample));
+        Assert.Empty(assembly.Failures("V", "ListedEmpty"));
+    }
+
+    [Theory]
+    [InlineData("ListedList")]
+    [InlineData("ListedArray")]
+    [InlineData("ListedImmutable")]
+    public void Each_over_an_indexable_interface_stops_on_failure_whatever_backs_it(string sample)
+    {
+        var assembly = Validator("""Each(x => x.Listed).Require(x => x.Filled()).Require(x => x != "").StopOnFailure();""");
+
+        Assert.Equal(["Listed[0]", "Listed[3]"], assembly.Paths("V", sample));
+    }
+
+    // Covariance: a string[] is an object[], so it takes the span, while a List<string> is not a List<object> and is indexed.
+    [Theory]
+    [InlineData("UpcastArray")]
+    [InlineData("UpcastList")]
+    public void Each_over_a_covariant_indexable_interface(string sample)
+    {
+        var assembly = Validator("""Each(x => x.Upcast).Require(x => x is not "");""");
+
+        Assert.Equal(["Upcast[1]"], assembly.Paths("V", sample));
+    }
+
+    [Theory]
+    [InlineData("OptionalList", "Optional[1]")]
+    [InlineData("OptionalArray", "Optional[0]")]
+    public void Each_over_an_indexable_interface_of_nullable_elements(string sample, string expected)
+    {
+        var assembly = Validator("Each(x => x.Optional).Require(x => x is not null);");
+
+        Assert.Equal([expected], assembly.Paths("V", sample));
+    }
+
+    [Theory]
+    [InlineData("LinesList")]
+    [InlineData("LinesArray")]
+    [InlineData("Lines")]
+    public void Each_ValidateWith_over_an_indexable_interface_whatever_backs_it(string sample)
+    {
+        var assembly = Validator("Each(x => x.Lines).ValidateWith<ItemValidator>();");
+
+        string[] expected = sample == "Lines" ? ["Lines[0].Name"] : ["Lines[1].Name", "Lines[1].Quantity"];
+        Assert.Equal(expected, assembly.Paths("V", sample));
     }
 
     [Fact]

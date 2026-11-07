@@ -100,7 +100,10 @@ public class GeneratedShapeTests
         }
     }
 
-    /// <summary>foreach over an interface boxes its enumerator. An indexable one is walked by index instead.</summary>
+    /// <summary>
+    /// foreach over an interface can box its enumerator. An indexable one walks a span when it holds a List or an
+    /// array, and is indexed otherwise.
+    /// </summary>
     [Fact]
     public void Each_over_an_indexable_interface_is_a_for_loop()
     {
@@ -132,6 +135,12 @@ public class GeneratedShapeTests
         string[] expected =
         [
             "if (items0 is not null)",
+            "if (items0 is global::System.Collections.Generic.List<string> list0) span0 = global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(list0);",
+            "else if (items0 is string[] array0) span0 = array0;",
+            "for (var index0 = 0; index0 < span0.Length; index0++)",
+            "var item0 = span0[index0];",
+            "if (items1 is global::System.Collections.Generic.List<int> list1) span1 = global::System.Runtime.InteropServices.CollectionsMarshal.AsSpan(list1);",
+            "else if (items1 is int[] array1) span1 = array1;",
             "for (var index0 = 0; index0 < items0.Count; index0++)",
             "var item0 = items0[index0];",
             """failures.PrefixFrom(start0, "Labels", index0);""",
